@@ -1000,9 +1000,42 @@
         return;
       }
 
-      const statusOrder = { FINISHED: 0, RACING: 1, REGISTERED: 2, DNF: 3 };
-      runners.sort((a, b) => (statusOrder[a.status] ?? 9) - (statusOrder[b.status] ?? 9));
+      const checkpointOrder = {
+        'Finish Line': 9,
+        'Aid Station 8': 8,
+        'Aid Station 7': 7,
+        'Aid Station 6': 6,
+        'Aid Station 5': 5,
+        'Aid Station 4': 4,
+        'Aid Station 3': 3,
+        'Aid Station 2': 2,
+        'Aid Station 1': 1,
+        'Not started': 0
+    };
 
+    runners.sort((a, b) => {
+    // DNF always last
+    if (a.status === 'DNF' && b.status !== 'DNF') return 1;
+    if (b.status === 'DNF' && a.status !== 'DNF') return -1;
+
+    // Both finished — whoever finished first wins
+    if (a.status === 'FINISHED' && b.status === 'FINISHED') {
+        return (a.lastSeen || '').localeCompare(b.lastSeen || '');
+    }
+
+    // Finished beats everyone
+    if (a.status === 'FINISHED') return -1;
+    if (b.status === 'FINISHED') return 1;
+
+    // Sort by furthest checkpoint
+    const aScore = checkpointOrder[a.lastCheckpoint] ?? 0;
+    const bScore = checkpointOrder[b.lastCheckpoint] ?? 0;
+
+    if (bScore !== aScore) return bScore - aScore;
+
+    // Same checkpoint — whoever got there first wins
+    return (a.lastSeen || '').localeCompare(b.lastSeen || '');
+    });
       tbody.innerHTML = runners.map((r, i) => `
         <tr>
           <td><span class="rank ${i < 3 ? 'top' : ''}">${i + 1}</span></td>
