@@ -28,16 +28,13 @@ jobs:
           aws-secret-access-key: ${{ secrets.AWS_SECRET_ACCESS_KEY }}
           aws-region: eu-west-1
 
-      - name: SAM Build
-        run: sam build
-
-      - name: SAM Deploy
+      - name: Deploy Lambda functions
         run: |
-          sam deploy \
-            --no-confirm-changeset \
-            --no-fail-on-empty-changeset \
-            --stack-name ultra-race-tracker \
-            --region eu-west-1 \
-            --capabilities CAPABILITY_IAM \
-            --resolve-s3 \
-            --on-failure DO_NOTHING
+          for func in RegisterRunner CheckInRunner GetRunnerStatus SendCrewAlert ProcessDNF GenerateRaceResult UpdateLeaderboard ArchiveRaceData ValidateMarshall; do
+            echo "Deploying $func..."
+            zip -j $func.zip functions/$func/lambda_function.py
+            aws lambda update-function-code \
+              --function-name $func \
+              --zip-file fileb://$func.zip \
+              --region eu-west-1
+          done
