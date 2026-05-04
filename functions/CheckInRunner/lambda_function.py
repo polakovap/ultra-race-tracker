@@ -42,16 +42,26 @@ def lambda_handler(event, context):
                 'checkpoint': checkpoint
         })
 
+        new_status = 'FINISHED' if checkpoint == 'Finish Line' else 'RACING'
+
         runners_table.update_item(
             Key={'raceId': race_id, 'bibNumber': bib_number},
             UpdateExpression='SET #s = :s, lastCheckpoint = :c, lastSeen = :t',
             ExpressionAttributeNames={'#s': 'status'},
             ExpressionAttributeValues={
-                ':s': 'RACING',
+                ':s': new_status,
                 ':c': checkpoint,
                 ':t': timestamp
             }
         )
+
+        if new_status == 'FINISHED':
+            lambda_client = boto3.client('lambda')
+            lambda_client.invoke(
+                FunctionName='GenerateRaceResult',
+                InvocationType='Event',
+                Payload=json.dumps({'raceId': race_id, 'bibNumber': bib_number})
+            )
 
         runner = runners_table.get_item(
             Key={'raceId': race_id, 'bibNumber': bib_number}
