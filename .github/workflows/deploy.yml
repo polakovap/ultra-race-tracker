@@ -38,3 +38,13 @@ jobs:
               --zip-file fileb://$func.zip \
               --region eu-west-1
           done
+
+      - name: Deploy frontend to S3
+        run: |
+          aws s3 cp index.html s3://ultra-race-results-s00239846/index.html --region eu-west-1
+
+      - name: Invalidate CloudFront cache
+        run: |
+          aws cloudfront create-invalidation \
+            --distribution-id E26TU5K9KC7NDS \
+            --paths "/index.html"
