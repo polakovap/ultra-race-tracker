@@ -1,0 +1,119 @@
+AWSTemplateFormatVersion: '2010-09-09'
+Transform: AWS::Serverless-2016-10-31
+Description: Ultra Running Race Tracker
+
+Globals:
+  Function:
+    Runtime: python3.10
+    Timeout: 15
+    Environment:
+      Variables:
+        RUNNERS_TABLE: Runners
+        CHECKINS_TABLE: CheckIns
+
+Resources:
+
+  RegisterRunner:
+    Type: AWS::Serverless::Function
+    Properties:
+      FunctionName: RegisterRunner
+      CodeUri: functions/RegisterRunner/
+      Handler: lambda_function.lambda_handler
+      Role: arn:aws:iam::965152014974:role/RegisterRunnerRole
+      Environment:
+        Variables:
+          RUNNERS_TABLE: Runners
+
+  CheckInRunner:
+    Type: AWS::Serverless::Function
+    Properties:
+      FunctionName: CheckInRunner
+      CodeUri: functions/CheckInRunner/
+      Handler: lambda_function.lambda_handler
+      Role: arn:aws:iam::965152014974:role/CheckInRunnerRole
+      Environment:
+        Variables:
+          RUNNERS_TABLE: Runners
+          CHECKINS_TABLE: CheckIns
+          NOTIFICATION_QUEUE_URL: !Sub "https://sqs.eu-west-1.amazonaws.com/965152014974/CrewNotificationQueue"
+
+  GetRunnerStatus:
+    Type: AWS::Serverless::Function
+    Properties:
+      FunctionName: GetRunnerStatus
+      CodeUri: functions/GetRunnerStatus/
+      Handler: lambda_function.lambda_handler
+      Role: arn:aws:iam::965152014974:role/GetRunnerStatusRole
+      Environment:
+        Variables:
+          RUNNERS_TABLE: Runners
+          CHECKINS_TABLE: CheckIns
+
+  SendCrewAlert:
+    Type: AWS::Serverless::Function
+    Properties:
+      FunctionName: SendCrewAlert
+      CodeUri: functions/SendCrewAlert/
+      Handler: lambda_function.lambda_handler
+      Role: arn:aws:iam::965152014974:role/SendCrewAlertRole
+      Environment:
+        Variables:
+          SNS_TOPIC_ARN: arn:aws:sns:eu-west-1:965152014974:CrewAlertTopic
+
+  ProcessDNF:
+    Type: AWS::Serverless::Function
+    Properties:
+      FunctionName: ProcessDNF
+      CodeUri: functions/ProcessDNF/
+      Handler: lambda_function.lambda_handler
+      Role: arn:aws:iam::965152014974:role/ProcessDNFRole
+      Environment:
+        Variables:
+          RUNNERS_TABLE: Runners
+          NOTIFICATION_QUEUE_URL: !Sub "https://sqs.eu-west-1.amazonaws.com/965152014974/CrewNotificationQueue"
+
+  GenerateRaceResult:
+    Type: AWS::Serverless::Function
+    Properties:
+      FunctionName: GenerateRaceResult
+      CodeUri: functions/GenerateRaceResult/
+      Handler: lambda_function.lambda_handler
+      Role: arn:aws:iam::965152014974:role/GenerateRaceResultRole
+      Environment:
+        Variables:
+          RUNNERS_TABLE: Runners
+          CHECKINS_TABLE: CheckIns
+          RESULTS_BUCKET: !Sub "ultra-race-results-${AWS::AccountId}"
+
+  UpdateLeaderboard:
+    Type: AWS::Serverless::Function
+    Properties:
+      FunctionName: UpdateLeaderboard
+      CodeUri: functions/UpdateLeaderboard/
+      Handler: lambda_function.lambda_handler
+      Role: arn:aws:iam::965152014974:role/UpdateLeaderboardRole
+      Environment:
+        Variables:
+          RUNNERS_TABLE: Runners
+          CHECKINS_TABLE: CheckIns
+
+  ArchiveRaceData:
+    Type: AWS::Serverless::Function
+    Properties:
+      FunctionName: ArchiveRaceData
+      CodeUri: functions/ArchiveRaceData/
+      Handler: lambda_function.lambda_handler
+      Role: arn:aws:iam::965152014974:role/ArchiveRaceDataRole
+      Environment:
+        Variables:
+          RUNNERS_TABLE: Runners
+          CHECKINS_TABLE: CheckIns
+          RESULTS_BUCKET: !Sub "ultra-race-results-${AWS::AccountId}"
+
+  ValidateMarshall:
+    Type: AWS::Serverless::Function
+    Properties:
+      FunctionName: ValidateMarshall
+      CodeUri: functions/ValidateMarshall/
+      Handler: lambda_function.lambda_handler
+      Role: arn:aws:iam::965152014974:role/ValidateMarshallRole
