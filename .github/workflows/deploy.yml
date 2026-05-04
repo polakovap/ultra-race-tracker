@@ -39,4 +39,5 @@ jobs:
             --stack-name ultra-race-tracker \
             --region eu-west-1 \
             --capabilities CAPABILITY_IAM \
-            --resolve-s3
+            --resolve-s3 \
+            --on-failure DO_NOTHING
