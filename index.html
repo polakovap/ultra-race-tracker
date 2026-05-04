@@ -808,8 +808,7 @@
       <div class="section-title">🔐 Marshall Authentication Required</div>
       <div class="form-card" style="margin-bottom:20px;">
         <label class="input-label">Marshall Token</label>
-        <input type="text" id="marshall-token" placeholder="marshall-token-001" value="marshall-token-001" />
-        <div class="token-hint">Tokens: marshall-token-001 / marshall-token-002 / marshall-token-003</div>
+        <input type="password" id="marshall-token" placeholder="Enter marshall token" value="" />
       </div>
     </div>
 
@@ -1147,6 +1146,8 @@
         showToast(`✓ Runner ${name} registered as bib #${bib}`);
         document.getElementById('reg-bib').value = '';
         document.getElementById('reg-name').value = '';
+        document.getElementById('reg-crew-contact').value = '';
+        document.getElementById('reg-crew-name').value = '';
       } else {
         showToast(data.error || 'Registration failed', 'error');
       }
