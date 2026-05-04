@@ -1,0 +1,1133 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Atlantic Ultra 100K — Race Tracker</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link href="https://fonts.googleapis.com/css2?family=Barlow+Condensed:wght@300;400;600;700;900&family=Barlow:wght@300;400;500&family=Space+Mono:wght@400;700&display=swap" rel="stylesheet">
+<style>
+  :root {
+    --bg: #0a0b0d;
+    --bg2: #111316;
+    --bg3: #1a1d22;
+    --border: rgba(255,255,255,0.07);
+    --accent: #f97316;
+    --accent2: #fb923c;
+    --green: #22c55e;
+    --red: #ef4444;
+    --blue: #3b82f6;
+    --text: #e8e9eb;
+    --muted: #6b7280;
+    --card: #13151a;
+    --API: 'https://85i25doji5.execute-api.eu-west-1.amazonaws.com/dev';
+  }
+
+  * { margin: 0; padding: 0; box-sizing: border-box; }
+
+  body {
+    background: var(--bg);
+    color: var(--text);
+    font-family: 'Barlow', sans-serif;
+    font-weight: 300;
+    min-height: 100vh;
+    overflow-x: hidden;
+  }
+
+  /* Background texture */
+  body::before {
+    content: '';
+    position: fixed;
+    inset: 0;
+    background: 
+      radial-gradient(ellipse 80% 50% at 50% -20%, rgba(249,115,22,0.08) 0%, transparent 60%),
+      radial-gradient(ellipse 40% 40% at 90% 80%, rgba(59,130,246,0.05) 0%, transparent 50%);
+    pointer-events: none;
+    z-index: 0;
+  }
+
+  /* Topographic line pattern */
+  body::after {
+    content: '';
+    position: fixed;
+    inset: 0;
+    background-image: repeating-linear-gradient(
+      0deg,
+      transparent,
+      transparent 39px,
+      rgba(255,255,255,0.015) 39px,
+      rgba(255,255,255,0.015) 40px
+    );
+    pointer-events: none;
+    z-index: 0;
+  }
+
+  .wrap { position: relative; z-index: 1; max-width: 1100px; margin: 0 auto; padding: 0 24px; }
+
+  /* ── HEADER ── */
+  header {
+    border-bottom: 1px solid var(--border);
+    padding: 0;
+    position: sticky;
+    top: 0;
+    background: rgba(10,11,13,0.92);
+    backdrop-filter: blur(12px);
+    z-index: 100;
+  }
+
+  .header-inner {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    padding: 16px 24px;
+    max-width: 1100px;
+    margin: 0 auto;
+  }
+
+  .logo {
+    display: flex;
+    align-items: center;
+    gap: 12px;
+  }
+
+  .logo-icon {
+    width: 36px;
+    height: 36px;
+    background: var(--accent);
+    border-radius: 8px;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    font-family: 'Barlow Condensed', sans-serif;
+    font-weight: 900;
+    font-size: 18px;
+    color: white;
+    letter-spacing: -1px;
+  }
+
+  .logo-text {
+    font-family: 'Barlow Condensed', sans-serif;
+    font-weight: 700;
+    font-size: 20px;
+    letter-spacing: 0.5px;
+    text-transform: uppercase;
+  }
+
+  .logo-text span { color: var(--accent); }
+
+  .race-badge {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    background: rgba(34,197,94,0.1);
+    border: 1px solid rgba(34,197,94,0.2);
+    border-radius: 20px;
+    padding: 6px 14px;
+    font-family: 'Space Mono', monospace;
+    font-size: 11px;
+    color: var(--green);
+    letter-spacing: 0.5px;
+  }
+
+  .live-dot {
+    width: 7px;
+    height: 7px;
+    background: var(--green);
+    border-radius: 50%;
+    animation: pulse 2s infinite;
+  }
+
+  @keyframes pulse {
+    0%, 100% { opacity: 1; transform: scale(1); }
+    50% { opacity: 0.5; transform: scale(0.8); }
+  }
+
+  /* ── HERO ── */
+  .hero {
+    padding: 60px 0 40px;
+    text-align: center;
+  }
+
+  .hero-eyebrow {
+    font-family: 'Space Mono', monospace;
+    font-size: 11px;
+    color: var(--accent);
+    letter-spacing: 3px;
+    text-transform: uppercase;
+    margin-bottom: 16px;
+  }
+
+  .hero-title {
+    font-family: 'Barlow Condensed', sans-serif;
+    font-weight: 900;
+    font-size: clamp(52px, 8vw, 96px);
+    line-height: 0.9;
+    text-transform: uppercase;
+    letter-spacing: -2px;
+    margin-bottom: 8px;
+  }
+
+  .hero-title .highlight {
+    color: var(--accent);
+    display: block;
+  }
+
+  .hero-sub {
+    font-size: 15px;
+    color: var(--muted);
+    font-weight: 300;
+    letter-spacing: 1px;
+    margin-bottom: 48px;
+  }
+
+  /* ── STATS BAR ── */
+  .stats-bar {
+    display: grid;
+    grid-template-columns: repeat(4, 1fr);
+    gap: 1px;
+    background: var(--border);
+    border: 1px solid var(--border);
+    border-radius: 12px;
+    overflow: hidden;
+    margin-bottom: 48px;
+  }
+
+  .stat {
+    background: var(--card);
+    padding: 20px 24px;
+    text-align: center;
+  }
+
+  .stat-value {
+    font-family: 'Barlow Condensed', sans-serif;
+    font-weight: 700;
+    font-size: 32px;
+    color: var(--accent);
+    line-height: 1;
+    margin-bottom: 4px;
+  }
+
+  .stat-label {
+    font-size: 11px;
+    color: var(--muted);
+    text-transform: uppercase;
+    letter-spacing: 1px;
+    font-family: 'Space Mono', monospace;
+  }
+
+  /* ── TABS ── */
+  .tabs {
+    display: flex;
+    gap: 4px;
+    border-bottom: 1px solid var(--border);
+    margin-bottom: 32px;
+  }
+
+  .tab {
+    padding: 12px 24px;
+    font-family: 'Barlow Condensed', sans-serif;
+    font-weight: 600;
+    font-size: 14px;
+    text-transform: uppercase;
+    letter-spacing: 1px;
+    color: var(--muted);
+    cursor: pointer;
+    border-bottom: 2px solid transparent;
+    margin-bottom: -1px;
+    transition: all 0.2s;
+    background: none;
+    border-top: none;
+    border-left: none;
+    border-right: none;
+  }
+
+  .tab:hover { color: var(--text); }
+  .tab.active { color: var(--accent); border-bottom-color: var(--accent); }
+
+  .tab-content { display: none; }
+  .tab-content.active { display: block; }
+
+  /* ── RUNNER LOOKUP ── */
+  .lookup-card {
+    background: var(--card);
+    border: 1px solid var(--border);
+    border-radius: 16px;
+    padding: 32px;
+    margin-bottom: 24px;
+  }
+
+  .lookup-card h2 {
+    font-family: 'Barlow Condensed', sans-serif;
+    font-weight: 700;
+    font-size: 22px;
+    text-transform: uppercase;
+    letter-spacing: 1px;
+    margin-bottom: 20px;
+    display: flex;
+    align-items: center;
+    gap: 10px;
+  }
+
+  .lookup-card h2::before {
+    content: '';
+    width: 4px;
+    height: 22px;
+    background: var(--accent);
+    border-radius: 2px;
+    display: block;
+  }
+
+  .input-row {
+    display: flex;
+    gap: 12px;
+  }
+
+  .input-wrap {
+    flex: 1;
+    position: relative;
+  }
+
+  .input-label {
+    font-family: 'Space Mono', monospace;
+    font-size: 10px;
+    color: var(--muted);
+    letter-spacing: 1px;
+    text-transform: uppercase;
+    margin-bottom: 6px;
+    display: block;
+  }
+
+  input, select {
+    width: 100%;
+    background: var(--bg3);
+    border: 1px solid var(--border);
+    border-radius: 8px;
+    padding: 12px 16px;
+    color: var(--text);
+    font-family: 'Space Mono', monospace;
+    font-size: 13px;
+    outline: none;
+    transition: border-color 0.2s;
+  }
+
+  input:focus, select:focus {
+    border-color: var(--accent);
+  }
+
+  select option { background: var(--bg3); }
+
+  .btn {
+    padding: 12px 28px;
+    border-radius: 8px;
+    border: none;
+    font-family: 'Barlow Condensed', sans-serif;
+    font-weight: 700;
+    font-size: 14px;
+    text-transform: uppercase;
+    letter-spacing: 1.5px;
+    cursor: pointer;
+    transition: all 0.2s;
+    white-space: nowrap;
+    align-self: flex-end;
+  }
+
+  .btn-primary {
+    background: var(--accent);
+    color: white;
+  }
+
+  .btn-primary:hover {
+    background: var(--accent2);
+    transform: translateY(-1px);
+  }
+
+  .btn-secondary {
+    background: var(--bg3);
+    color: var(--text);
+    border: 1px solid var(--border);
+  }
+
+  .btn-secondary:hover { border-color: var(--accent); color: var(--accent); }
+
+  .btn-danger {
+    background: rgba(239,68,68,0.1);
+    color: var(--red);
+    border: 1px solid rgba(239,68,68,0.2);
+  }
+
+  .btn-danger:hover { background: rgba(239,68,68,0.2); }
+
+  /* ── RUNNER RESULT CARD ── */
+  .runner-result {
+    background: var(--card);
+    border: 1px solid var(--border);
+    border-radius: 16px;
+    overflow: hidden;
+    margin-bottom: 24px;
+    display: none;
+  }
+
+  .runner-result.visible { display: block; animation: slideUp 0.3s ease; }
+
+  @keyframes slideUp {
+    from { opacity: 0; transform: translateY(12px); }
+    to { opacity: 1; transform: translateY(0); }
+  }
+
+  .runner-header {
+    padding: 24px 32px;
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    border-bottom: 1px solid var(--border);
+    background: rgba(255,255,255,0.02);
+  }
+
+  .runner-bib {
+    font-family: 'Barlow Condensed', sans-serif;
+    font-weight: 900;
+    font-size: 48px;
+    color: var(--accent);
+    line-height: 1;
+  }
+
+  .runner-info h3 {
+    font-family: 'Barlow Condensed', sans-serif;
+    font-weight: 700;
+    font-size: 26px;
+    text-transform: uppercase;
+    letter-spacing: 0.5px;
+  }
+
+  .runner-info p {
+    font-size: 13px;
+    color: var(--muted);
+    font-family: 'Space Mono', monospace;
+    margin-top: 4px;
+  }
+
+  .status-badge {
+    padding: 8px 16px;
+    border-radius: 20px;
+    font-family: 'Barlow Condensed', sans-serif;
+    font-weight: 700;
+    font-size: 13px;
+    text-transform: uppercase;
+    letter-spacing: 1px;
+  }
+
+  .status-RACING { background: rgba(59,130,246,0.15); color: #60a5fa; border: 1px solid rgba(59,130,246,0.2); }
+  .status-REGISTERED { background: rgba(107,114,128,0.15); color: #9ca3af; border: 1px solid rgba(107,114,128,0.2); }
+  .status-FINISHED { background: rgba(34,197,94,0.15); color: #4ade80; border: 1px solid rgba(34,197,94,0.2); }
+  .status-DNF { background: rgba(239,68,68,0.15); color: #f87171; border: 1px solid rgba(239,68,68,0.2); }
+
+  /* ── CHECKPOINT TIMELINE ── */
+  .checkpoints {
+    padding: 24px 32px;
+  }
+
+  .checkpoints h4 {
+    font-family: 'Barlow Condensed', sans-serif;
+    font-weight: 600;
+    font-size: 12px;
+    text-transform: uppercase;
+    letter-spacing: 2px;
+    color: var(--muted);
+    margin-bottom: 20px;
+  }
+
+  .timeline {
+    position: relative;
+    padding-left: 24px;
+  }
+
+  .timeline::before {
+    content: '';
+    position: absolute;
+    left: 7px;
+    top: 8px;
+    bottom: 8px;
+    width: 1px;
+    background: var(--border);
+  }
+
+  .timeline-item {
+    position: relative;
+    padding: 0 0 20px 24px;
+    display: flex;
+    align-items: flex-start;
+    justify-content: space-between;
+    gap: 16px;
+  }
+
+  .timeline-item:last-child { padding-bottom: 0; }
+
+  .timeline-dot {
+    position: absolute;
+    left: -17px;
+    top: 4px;
+    width: 10px;
+    height: 10px;
+    border-radius: 50%;
+    background: var(--accent);
+    border: 2px solid var(--bg);
+  }
+
+  .timeline-checkpoint {
+    font-family: 'Barlow Condensed', sans-serif;
+    font-weight: 600;
+    font-size: 15px;
+    text-transform: uppercase;
+    letter-spacing: 0.5px;
+  }
+
+  .timeline-time {
+    font-family: 'Space Mono', monospace;
+    font-size: 11px;
+    color: var(--muted);
+    white-space: nowrap;
+  }
+
+  .no-checkpoints {
+    font-size: 13px;
+    color: var(--muted);
+    font-style: italic;
+    padding: 8px 0;
+  }
+
+  /* ── MARSHALL PANEL ── */
+  .marshall-grid {
+    display: grid;
+    grid-template-columns: 1fr 1fr;
+    gap: 20px;
+  }
+
+  @media (max-width: 640px) { .marshall-grid { grid-template-columns: 1fr; } }
+
+  .form-card {
+    background: var(--card);
+    border: 1px solid var(--border);
+    border-radius: 16px;
+    padding: 28px;
+  }
+
+  .form-card h2 {
+    font-family: 'Barlow Condensed', sans-serif;
+    font-weight: 700;
+    font-size: 20px;
+    text-transform: uppercase;
+    letter-spacing: 1px;
+    margin-bottom: 20px;
+    display: flex;
+    align-items: center;
+    gap: 10px;
+  }
+
+  .form-card h2::before {
+    content: '';
+    width: 4px;
+    height: 20px;
+    border-radius: 2px;
+    display: block;
+  }
+
+  .form-card:first-child h2::before { background: var(--accent); }
+  .form-card:last-child h2::before { background: var(--red); }
+
+  .form-group {
+    margin-bottom: 16px;
+  }
+
+  .token-hint {
+    font-family: 'Space Mono', monospace;
+    font-size: 10px;
+    color: var(--muted);
+    margin-top: 6px;
+  }
+
+  /* ── RESPONSE TOAST ── */
+  .toast {
+    position: fixed;
+    bottom: 24px;
+    right: 24px;
+    padding: 14px 20px;
+    border-radius: 10px;
+    font-family: 'Barlow Condensed', sans-serif;
+    font-weight: 600;
+    font-size: 14px;
+    letter-spacing: 0.5px;
+    z-index: 999;
+    transform: translateY(80px);
+    opacity: 0;
+    transition: all 0.3s ease;
+    max-width: 320px;
+  }
+
+  .toast.show { transform: translateY(0); opacity: 1; }
+  .toast.success { background: rgba(34,197,94,0.15); border: 1px solid rgba(34,197,94,0.3); color: #4ade80; }
+  .toast.error { background: rgba(239,68,68,0.15); border: 1px solid rgba(239,68,68,0.3); color: #f87171; }
+
+  /* ── LOADING ── */
+  .spinner {
+    display: inline-block;
+    width: 14px;
+    height: 14px;
+    border: 2px solid rgba(255,255,255,0.2);
+    border-top-color: white;
+    border-radius: 50%;
+    animation: spin 0.6s linear infinite;
+    margin-right: 8px;
+    vertical-align: middle;
+  }
+
+  @keyframes spin { to { transform: rotate(360deg); } }
+
+  /* ── LEADERBOARD ── */
+  .leaderboard-table {
+    width: 100%;
+    border-collapse: collapse;
+  }
+
+  .leaderboard-table th {
+    font-family: 'Space Mono', monospace;
+    font-size: 10px;
+    color: var(--muted);
+    text-transform: uppercase;
+    letter-spacing: 1px;
+    padding: 12px 16px;
+    text-align: left;
+    border-bottom: 1px solid var(--border);
+  }
+
+  .leaderboard-table td {
+    padding: 14px 16px;
+    border-bottom: 1px solid var(--border);
+    font-size: 14px;
+  }
+
+  .leaderboard-table tr:last-child td { border-bottom: none; }
+
+  .leaderboard-table tr:hover td { background: rgba(255,255,255,0.02); }
+
+  .rank {
+    font-family: 'Barlow Condensed', sans-serif;
+    font-weight: 700;
+    font-size: 20px;
+    color: var(--muted);
+  }
+
+  .rank.top { color: var(--accent); }
+
+  .runner-name-cell {
+    font-family: 'Barlow Condensed', sans-serif;
+    font-weight: 600;
+    font-size: 16px;
+    text-transform: uppercase;
+    letter-spacing: 0.5px;
+  }
+
+  .checkpoint-cell {
+    font-family: 'Space Mono', monospace;
+    font-size: 11px;
+    color: var(--muted);
+  }
+
+  /* ── ELEVATION BAR (decorative) ── */
+  .elevation-bar {
+    height: 40px;
+    background: linear-gradient(90deg, 
+      var(--bg3) 0%, 
+      rgba(249,115,22,0.3) 20%, 
+      rgba(249,115,22,0.5) 35%, 
+      rgba(249,115,22,0.2) 55%, 
+      rgba(249,115,22,0.4) 70%, 
+      rgba(249,115,22,0.15) 85%,
+      var(--bg3) 100%
+    );
+    border-radius: 4px;
+    position: relative;
+    overflow: hidden;
+    margin-bottom: 48px;
+  }
+
+  .elevation-bar::after {
+    content: '▲ ELEVATION PROFILE — ATLANTIC ULTRA 100K — 2,800m GAIN';
+    position: absolute;
+    inset: 0;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    font-family: 'Space Mono', monospace;
+    font-size: 9px;
+    color: rgba(249,115,22,0.6);
+    letter-spacing: 2px;
+  }
+
+  .section-title {
+    font-family: 'Barlow Condensed', sans-serif;
+    font-weight: 700;
+    font-size: 13px;
+    text-transform: uppercase;
+    letter-spacing: 2px;
+    color: var(--muted);
+    margin-bottom: 16px;
+  }
+
+  @media (max-width: 600px) {
+    .stats-bar { grid-template-columns: repeat(2, 1fr); }
+    .input-row { flex-direction: column; }
+    .hero-title { font-size: 48px; }
+  }
+</style>
+</head>
+<body>
+
+<header>
+  <div class="header-inner">
+    <div class="logo">
+      <div class="logo-icon">AU</div>
+      <div class="logo-text">Atlantic <span>Ultra</span></div>
+    </div>
+    <div class="race-badge">
+      <div class="live-dot"></div>
+      LIVE — Race Day
+    </div>
+  </div>
+</header>
+
+<div class="wrap">
+
+  <div class="hero">
+    <div class="hero-eyebrow">▲ Atlantic Coast Trail Series</div>
+    <h1 class="hero-title">
+      100K
+      <span class="highlight">Race Tracker</span>
+    </h1>
+    <p class="hero-sub">Live runner tracking · Aid station check-ins · Real-time updates</p>
+
+    <div class="stats-bar">
+      <div class="stat">
+        <div class="stat-value" id="stat-distance">100</div>
+        <div class="stat-label">Kilometres</div>
+      </div>
+      <div class="stat">
+        <div class="stat-value" id="stat-gain">2,800</div>
+        <div class="stat-label">Metres Gain</div>
+      </div>
+      <div class="stat">
+        <div class="stat-value" id="stat-checkpoints">8</div>
+        <div class="stat-label">Aid Stations</div>
+      </div>
+      <div class="stat">
+        <div class="stat-value" id="stat-cutoff">24h</div>
+        <div class="stat-label">Cutoff Time</div>
+      </div>
+    </div>
+
+    <div class="elevation-bar"></div>
+  </div>
+
+  <!-- TABS -->
+  <div class="tabs">
+    <button class="tab active" onclick="switchTab('tracker')">🏃 Runner Tracker</button>
+    <button class="tab" onclick="switchTab('leaderboard')">🏆 Leaderboard</button>
+    <button class="tab" onclick="switchTab('marshall')">📡 Marshall Panel</button>
+  </div>
+
+  <!-- TAB: TRACKER -->
+  <div id="tab-tracker" class="tab-content active">
+    <div class="lookup-card">
+      <h2>Find a Runner</h2>
+      <div class="input-row">
+        <div class="input-wrap">
+          <label class="input-label">Bib Number</label>
+          <input type="text" id="lookup-bib" placeholder="e.g. 001" />
+        </div>
+        <div class="input-wrap">
+          <label class="input-label">Race ID</label>
+          <input type="text" id="lookup-race" value="race-001" />
+        </div>
+        <button class="btn btn-primary" onclick="lookupRunner()">
+          Search
+        </button>
+      </div>
+    </div>
+
+    <div class="runner-result" id="runner-result">
+      <div class="runner-header">
+        <div style="display:flex; align-items:center; gap:20px;">
+          <div class="runner-bib" id="result-bib">001</div>
+          <div class="runner-info">
+            <h3 id="result-name">Runner Name</h3>
+            <p id="result-last">Last seen: Aid Station 1</p>
+          </div>
+        </div>
+        <div class="status-badge" id="result-status">RACING</div>
+      </div>
+      <div class="checkpoints">
+        <h4>Checkpoint History</h4>
+        <div class="timeline" id="timeline"></div>
+      </div>
+    </div>
+  </div>
+
+  <!-- TAB: LEADERBOARD -->
+  <div id="tab-leaderboard" class="tab-content">
+    <div class="lookup-card">
+      <h2>Live Standings</h2>
+      <div class="input-row">
+        <div class="input-wrap">
+          <label class="input-label">Bib Numbers to check (comma separated)</label>
+          <input type="text" id="lb-bibs" placeholder="001, 002, 003" value="001, 002, 003" />
+        </div>
+        <button class="btn btn-primary" onclick="loadLeaderboard()">Refresh</button>
+      </div>
+    </div>
+    <div class="form-card" style="padding:0; overflow:hidden;">
+      <table class="leaderboard-table">
+        <thead>
+          <tr>
+            <th>#</th>
+            <th>Bib</th>
+            <th>Runner</th>
+            <th>Last Checkpoint</th>
+            <th>Status</th>
+            <th>Last Seen</th>
+          </tr>
+        </thead>
+        <tbody id="leaderboard-body">
+          <tr><td colspan="6" style="text-align:center; color:var(--muted); padding:32px; font-size:13px;">Click Refresh to load standings</td></tr>
+        </tbody>
+      </table>
+    </div>
+  </div>
+
+  <!-- TAB: MARSHALL -->
+  <div id="tab-marshall" class="tab-content">
+    <div style="margin-bottom:16px;">
+      <div class="section-title">🔐 Marshall Authentication Required</div>
+      <div class="form-card" style="margin-bottom:20px;">
+        <label class="input-label">Marshall Token</label>
+        <input type="text" id="marshall-token" placeholder="marshall-token-001" value="marshall-token-001" />
+        <div class="token-hint">Tokens: marshall-token-001 / marshall-token-002 / marshall-token-003</div>
+      </div>
+    </div>
+
+    <div class="marshall-grid">
+      <!-- CHECK IN -->
+      <div class="form-card">
+        <h2>Check In Runner</h2>
+        <div class="form-group">
+          <label class="input-label">Race ID</label>
+          <input type="text" id="ci-race" value="race-001" />
+        </div>
+        <div class="form-group">
+          <label class="input-label">Bib Number</label>
+          <input type="text" id="ci-bib" placeholder="001" />
+        </div>
+        <div class="form-group">
+          <label class="input-label">Checkpoint</label>
+          <select id="ci-checkpoint">
+            <option>Aid Station 1</option>
+            <option>Aid Station 2</option>
+            <option>Aid Station 3</option>
+            <option>Aid Station 4</option>
+            <option>Aid Station 5</option>
+            <option>Aid Station 6</option>
+            <option>Aid Station 7</option>
+            <option>Aid Station 8</option>
+            <option>Finish Line</option>
+          </select>
+        </div>
+        <button class="btn btn-primary" style="width:100%" onclick="checkInRunner()">
+          Record Check-In
+        </button>
+      </div>
+
+      <!-- DNF -->
+      <div class="form-card">
+        <h2>Process DNF</h2>
+        <div class="form-group">
+          <label class="input-label">Race ID</label>
+          <input type="text" id="dnf-race" value="race-001" />
+        </div>
+        <div class="form-group">
+          <label class="input-label">Bib Number</label>
+          <input type="text" id="dnf-bib" placeholder="001" />
+        </div>
+        <div class="form-group">
+          <label class="input-label">Reason</label>
+          <select id="dnf-reason">
+            <option value="VOLUNTARY_DNF">Voluntary DNF</option>
+            <option value="INJURY">Injury</option>
+            <option value="TIME_CUTOFF">Time Cutoff</option>
+            <option value="MEDICAL">Medical</option>
+          </select>
+        </div>
+        <button class="btn btn-danger" style="width:100%" onclick="processDNF()">
+          Record DNF
+        </button>
+      </div>
+    </div>
+
+    <!-- REGISTER -->
+    <div class="form-card" style="margin-top:20px;">
+      <h2>Register New Runner</h2>
+      <div style="display:grid; grid-template-columns: 1fr 1fr 1fr; gap:16px; margin-bottom:16px;">
+        <div>
+          <label class="input-label">Bib Number</label>
+          <input type="text" id="reg-bib" placeholder="004" />
+        </div>
+        <div>
+          <label class="input-label">Runner Name</label>
+          <input type="text" id="reg-name" placeholder="Jane Doe" />
+        </div>
+        <div>
+          <label class="input-label">Race ID</label>
+          <input type="text" id="reg-race" value="race-001" />
+        </div>
+        <div>
+          <label class="input-label">Crew Contact</label>
+          <input type="text" id="reg-crew-contact" placeholder="+353861234567" />
+        </div>
+        <div>
+          <label class="input-label">Crew Name</label>
+          <input type="text" id="reg-crew-name" placeholder="John Doe" />
+        </div>
+        <div style="display:flex; align-items:flex-end;">
+          <button class="btn btn-secondary" style="width:100%" onclick="registerRunner()">Register</button>
+        </div>
+      </div>
+    </div>
+  </div>
+
+</div>
+
+<!-- TOAST -->
+<div class="toast" id="toast"></div>
+
+<script>
+  const API = 'https://85i25doji5.execute-api.eu-west-1.amazonaws.com/dev';
+
+  function switchTab(name) {
+    document.querySelectorAll('.tab').forEach(t => t.classList.remove('active'));
+    document.querySelectorAll('.tab-content').forEach(t => t.classList.remove('active'));
+    document.getElementById('tab-' + name).classList.add('active');
+    event.target.classList.add('active');
+  }
+
+  function showToast(msg, type = 'success') {
+    const t = document.getElementById('toast');
+    t.textContent = msg;
+    t.className = 'toast ' + type + ' show';
+    setTimeout(() => t.classList.remove('show'), 3500);
+  }
+
+  function setLoading(btnEl, loading) {
+    if (loading) {
+      btnEl._orig = btnEl.textContent;
+      btnEl.innerHTML = '<span class="spinner"></span>Loading...';
+      btnEl.disabled = true;
+    } else {
+      btnEl.textContent = btnEl._orig;
+      btnEl.disabled = false;
+    }
+  }
+
+  async function lookupRunner() {
+    const bib = document.getElementById('lookup-bib').value.trim();
+    const race = document.getElementById('lookup-race').value.trim();
+    const btn = event.target;
+
+    if (!bib) { showToast('Enter a bib number', 'error'); return; }
+
+    setLoading(btn, true);
+    try {
+      const res = await fetch(`${API}/runners/${bib}?raceId=${race}`);
+      const data = await res.json();
+
+      if (!res.ok) { showToast(data.error || 'Runner not found', 'error'); return; }
+
+      const r = data.runner;
+      document.getElementById('result-bib').textContent = '#' + r.bibNumber;
+      document.getElementById('result-name').textContent = r.runnerName;
+      document.getElementById('result-last').textContent = 'Last seen: ' + r.lastCheckpoint + ' · ' + (r.lastSeen ? r.lastSeen.slice(0,19).replace('T',' ') : 'N/A');
+
+      const statusEl = document.getElementById('result-status');
+      statusEl.textContent = r.status;
+      statusEl.className = 'status-badge status-' + r.status;
+
+      const timeline = document.getElementById('timeline');
+      if (data.checkpoints && data.checkpoints.length > 0) {
+        timeline.innerHTML = data.checkpoints.map(c => `
+          <div class="timeline-item">
+            <div class="timeline-dot"></div>
+            <div class="timeline-checkpoint">${c.checkpoint}</div>
+            <div class="timeline-time">${c.timestamp ? c.timestamp.slice(0,19).replace('T',' ') : ''}</div>
+          </div>
+        `).join('');
+      } else {
+        timeline.innerHTML = '<div class="no-checkpoints">No checkpoints recorded yet</div>';
+      }
+
+      document.getElementById('runner-result').classList.add('visible');
+      showToast('Runner found — ' + r.runnerName);
+    } catch(e) {
+      showToast('Network error — check console', 'error');
+    } finally {
+      setLoading(btn, false);
+    }
+  }
+
+  async function loadLeaderboard() {
+    const bibsRaw = document.getElementById('lb-bibs').value;
+    const bibs = bibsRaw.split(',').map(b => b.trim()).filter(Boolean);
+    const btn = event.target;
+    setLoading(btn, true);
+
+    const tbody = document.getElementById('leaderboard-body');
+    tbody.innerHTML = '<tr><td colspan="6" style="text-align:center; color:var(--muted); padding:32px; font-size:13px;">Loading...</td></tr>';
+
+    try {
+      const results = await Promise.all(bibs.map(bib =>
+        fetch(`${API}/runners/${bib}?raceId=race-001`).then(r => r.json()).catch(() => null)
+      ));
+
+      const runners = results.filter(r => r && r.runner).map(r => r.runner);
+
+      if (runners.length === 0) {
+        tbody.innerHTML = '<tr><td colspan="6" style="text-align:center; color:var(--muted); padding:32px;">No runners found</td></tr>';
+        return;
+      }
+
+      const statusOrder = { FINISHED: 0, RACING: 1, REGISTERED: 2, DNF: 3 };
+      runners.sort((a, b) => (statusOrder[a.status] ?? 9) - (statusOrder[b.status] ?? 9));
+
+      tbody.innerHTML = runners.map((r, i) => `
+        <tr>
+          <td><span class="rank ${i < 3 ? 'top' : ''}">${i + 1}</span></td>
+          <td><span style="font-family:'Space Mono',monospace; font-size:12px; color:var(--accent)">#${r.bibNumber}</span></td>
+          <td><span class="runner-name-cell">${r.runnerName}</span></td>
+          <td><span class="checkpoint-cell">${r.lastCheckpoint || '—'}</span></td>
+          <td><span class="status-badge status-${r.status}" style="font-size:11px; padding:4px 10px">${r.status}</span></td>
+          <td><span style="font-family:'Space Mono',monospace; font-size:11px; color:var(--muted)">${r.lastSeen ? r.lastSeen.slice(11,19) : '—'}</span></td>
+        </tr>
+      `).join('');
+
+      showToast('Leaderboard updated');
+    } catch(e) {
+      showToast('Failed to load leaderboard', 'error');
+    } finally {
+      setLoading(btn, false);
+    }
+  }
+
+  async function checkInRunner() {
+    const token = document.getElementById('marshall-token').value.trim();
+    const race = document.getElementById('ci-race').value.trim();
+    const bib = document.getElementById('ci-bib').value.trim();
+    const checkpoint = document.getElementById('ci-checkpoint').value;
+    const btn = event.target;
+
+    if (!bib) { showToast('Enter a bib number', 'error'); return; }
+    setLoading(btn, true);
+
+    try {
+      const res = await fetch(`${API}/checkin`, {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+          'Authorization': 'Bearer ' + token
+        },
+        body: JSON.stringify({ raceId: race, bibNumber: bib, checkpoint })
+      });
+      const data = await res.json();
+      if (res.ok) {
+        showToast(`✓ Bib #${bib} checked in at ${checkpoint}`);
+        document.getElementById('ci-bib').value = '';
+      } else {
+        showToast(data.message || data.error || 'Check-in failed', 'error');
+      }
+    } catch(e) {
+      showToast('Network error', 'error');
+    } finally {
+      setLoading(btn, false);
+    }
+  }
+
+  async function processDNF() {
+    const token = document.getElementById('marshall-token').value.trim();
+    const race = document.getElementById('dnf-race').value.trim();
+    const bib = document.getElementById('dnf-bib').value.trim();
+    const reason = document.getElementById('dnf-reason').value;
+    const btn = event.target;
+
+    if (!bib) { showToast('Enter a bib number', 'error'); return; }
+    setLoading(btn, true);
+
+    try {
+      const res = await fetch(`${API}/dnf`, {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+          'Authorization': 'Bearer ' + token
+        },
+        body: JSON.stringify({ raceId: race, bibNumber: bib, reason })
+      });
+      const data = await res.json();
+      if (res.ok) {
+        showToast(`DNF recorded for bib #${bib}`, 'error');
+        document.getElementById('dnf-bib').value = '';
+      } else {
+        showToast(data.message || data.error || 'DNF failed', 'error');
+      }
+    } catch(e) {
+      showToast('Network error', 'error');
+    } finally {
+      setLoading(btn, false);
+    }
+  }
+
+  async function registerRunner() {
+    const token = document.getElementById('marshall-token').value.trim();
+    const bib = document.getElementById('reg-bib').value.trim();
+    const name = document.getElementById('reg-name').value.trim();
+    const race = document.getElementById('reg-race').value.trim();
+    const crewContact = document.getElementById('reg-crew-contact').value.trim();
+    const crewName = document.getElementById('reg-crew-name').value.trim();
+    const btn = event.target;
+
+    if (!bib || !name) { showToast('Bib and name required', 'error'); return; }
+    setLoading(btn, true);
+
+    try {
+      const res = await fetch(`${API}/runners`, {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+          'Authorization': 'Bearer ' + token
+        },
+        body: JSON.stringify({ raceId: race, bibNumber: bib, runnerName: name, crewContact, crewName })
+      });
+      const data = await res.json();
+      if (res.ok) {
+        showToast(`✓ Runner ${name} registered as bib #${bib}`);
+        document.getElementById('reg-bib').value = '';
+        document.getElementById('reg-name').value = '';
+      } else {
+        showToast(data.error || 'Registration failed', 'error');
+      }
+    } catch(e) {
+      showToast('Network error', 'error');
+    } finally {
+      setLoading(btn, false);
+    }
+  }
+
+  // Enter key on lookup
+  document.getElementById('lookup-bib').addEventListener('keydown', e => {
+    if (e.key === 'Enter') lookupRunner();
+  });
+</script>
+</body>
+</html>
