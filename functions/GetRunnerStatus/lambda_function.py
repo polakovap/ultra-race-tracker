@@ -4,12 +4,19 @@ import os
 from datetime import datetime, timedelta
 
 dynamodb = boto3.resource('dynamodb')
+ssm = boto3.client('ssm')
 runners_table = dynamodb.Table(os.environ['RUNNERS_TABLE'])
 checkins_table = dynamodb.Table(os.environ['CHECKINS_TABLE'])
 
-# In-memory cache — persists across warm Lambda invocations
 _cache = {}
 CACHE_TTL_SECONDS = 30
+
+def get_allowed_origin():
+    try:
+        response = ssm.get_parameter(Name='/racetracker/allowed-origin')
+        return response['Parameter']['Value']
+    except:
+        return 'https://dbvofpz99i1r.cloudfront.net'
 
 def get_from_cache(key):
     if key in _cache:
@@ -30,6 +37,8 @@ def set_cache(key, data):
     }
 
 def lambda_handler(event, context):
+    allowed_origin = get_allowed_origin()
+
     try:
         bib_number = event.get('pathParameters', {}).get('bibNumber')
         race_id = (event.get('queryStringParameters') or {}).get('raceId', 'race-001')
@@ -37,7 +46,7 @@ def lambda_handler(event, context):
         if not bib_number:
             return {
                 'statusCode': 400,
-                'headers': {'Access-Control-Allow-Origin': '*'},
+                'headers': {'Access-Control-Allow-Origin': allowed_origin},
                 'body': json.dumps({'error': 'bibNumber is required'})
             }
 
@@ -48,13 +57,12 @@ def lambda_handler(event, context):
             return {
                 'statusCode': 200,
                 'headers': {
-                    'Access-Control-Allow-Origin': '*',
+                    'Access-Control-Allow-Origin': allowed_origin,
                     'X-Cache': 'HIT'
                 },
                 'body': json.dumps(cached, default=str)
             }
 
-        # Cache miss — fetch from DynamoDB
         runner = runners_table.get_item(
             Key={'raceId': race_id, 'bibNumber': bib_number}
         ).get('Item')
@@ -62,7 +70,7 @@ def lambda_handler(event, context):
         if not runner:
             return {
                 'statusCode': 404,
-                'headers': {'Access-Control-Allow-Origin': '*'},
+                'headers': {'Access-Control-Allow-Origin': allowed_origin},
                 'body': json.dumps({'error': 'Runner not found'})
             }
 
@@ -88,7 +96,7 @@ def lambda_handler(event, context):
         return {
             'statusCode': 200,
             'headers': {
-                'Access-Control-Allow-Origin': '*',
+                'Access-Control-Allow-Origin': allowed_origin,
                 'X-Cache': 'MISS'
             },
             'body': json.dumps(response_data, default=str)
@@ -97,6 +105,6 @@ def lambda_handler(event, context):
     except Exception as e:
         return {
             'statusCode': 500,
-            'headers': {'Access-Control-Allow-Origin': '*'},
+            'headers': {'Access-Control-Allow-Origin': allowed_origin},
             'body': json.dumps({'error': str(e)})
         }

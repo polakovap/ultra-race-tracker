@@ -5,15 +5,23 @@ from datetime import datetime
 
 dynamodb = boto3.resource('dynamodb')
 sqs = boto3.client('sqs')
-
+ssm = boto3.client('ssm')
 runners_table = dynamodb.Table(os.environ['RUNNERS_TABLE'])
 checkins_table = dynamodb.Table(os.environ['CHECKINS_TABLE'])
 queue_url = os.environ['NOTIFICATION_QUEUE_URL']
 
+def get_allowed_origin():
+    try:
+        response = ssm.get_parameter(Name='/racetracker/allowed-origin')
+        return response['Parameter']['Value']
+    except:
+        return 'https://dbvofpz99i1r.cloudfront.net'
+
 def lambda_handler(event, context):
+    allowed_origin = get_allowed_origin()
+
     try:
         body = json.loads(event.get('body', '{}'))
-
         race_id = body.get('raceId')
         bib_number = body.get('bibNumber')
         checkpoint = body.get('checkpoint')
@@ -21,21 +29,19 @@ def lambda_handler(event, context):
         if not all([race_id, bib_number, checkpoint]):
             return {
                 'statusCode': 400,
-                'headers': {'Access-Control-Allow-Origin': '*'},
+                'headers': {'Access-Control-Allow-Origin': allowed_origin},
                 'body': json.dumps({'error': 'Missing required fields'})
             }
 
         timestamp = datetime.utcnow().isoformat()
 
-        # Write check-in record
         checkins_table.put_item(Item={
             'bibNumber': bib_number,
             'timestamp': timestamp,
             'raceId': race_id,
-            'checkpoint': checkpoint
+                'checkpoint': checkpoint
         })
 
-        # Update runner status
         runners_table.update_item(
             Key={'raceId': race_id, 'bibNumber': bib_number},
             UpdateExpression='SET #s = :s, lastCheckpoint = :c, lastSeen = :t',
@@ -47,7 +53,6 @@ def lambda_handler(event, context):
             }
         )
 
-        # Push notification to SQS
         runner = runners_table.get_item(
             Key={'raceId': race_id, 'bibNumber': bib_number}
         ).get('Item', {})
@@ -67,7 +72,7 @@ def lambda_handler(event, context):
 
         return {
             'statusCode': 200,
-            'headers': {'Access-Control-Allow-Origin': '*'},
+            'headers': {'Access-Control-Allow-Origin': allowed_origin},
             'body': json.dumps({
                 'message': 'Check-in recorded',
                 'bibNumber': bib_number,
@@ -79,6 +84,6 @@ def lambda_handler(event, context):
     except Exception as e:
         return {
             'statusCode': 500,
-            'headers': {'Access-Control-Allow-Origin': '*'},
+            'headers': {'Access-Control-Allow-Origin': allowed_origin},
             'body': json.dumps({'error': str(e)})
         }

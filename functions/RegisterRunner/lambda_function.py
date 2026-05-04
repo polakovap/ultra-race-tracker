@@ -4,12 +4,21 @@ import os
 from datetime import datetime
 
 dynamodb = boto3.resource('dynamodb')
+ssm = boto3.client('ssm')
 table = dynamodb.Table(os.environ['RUNNERS_TABLE'])
 
+def get_allowed_origin():
+    try:
+        response = ssm.get_parameter(Name='/racetracker/allowed-origin')
+        return response['Parameter']['Value']
+    except:
+        return 'https://dbvofpz99i1r.cloudfront.net'
+
 def lambda_handler(event, context):
+    allowed_origin = get_allowed_origin()
+    
     try:
         body = json.loads(event.get('body', '{}'))
-        
         race_id = body.get('raceId')
         bib_number = body.get('bibNumber')
         runner_name = body.get('runnerName')
@@ -19,7 +28,7 @@ def lambda_handler(event, context):
         if not all([race_id, bib_number, runner_name, crew_contact, crew_name]):
             return {
                 'statusCode': 400,
-                'headers': {'Access-Control-Allow-Origin': '*'},
+                'headers': {'Access-Control-Allow-Origin': allowed_origin},
                 'body': json.dumps({'error': 'Missing required fields'})
             }
 
@@ -35,7 +44,7 @@ def lambda_handler(event, context):
 
         return {
             'statusCode': 201,
-            'headers': {'Access-Control-Allow-Origin': '*'},
+            'headers': {'Access-Control-Allow-Origin': allowed_origin},
             'body': json.dumps({
                 'message': 'Runner registered successfully',
                 'bibNumber': bib_number
@@ -45,6 +54,6 @@ def lambda_handler(event, context):
     except Exception as e:
         return {
             'statusCode': 500,
-            'headers': {'Access-Control-Allow-Origin': '*'},
+            'headers': {'Access-Control-Allow-Origin': allowed_origin},
             'body': json.dumps({'error': str(e)})
         }
