@@ -34,20 +34,25 @@ def lambda_handler(event, context):
             }
 
         # Subscribe crew email to SNS topic
-        param = ssm.get_parameter(
-            Name='/racetracker/sns-topic-arn',
-            WithDecryption=True
-        )
-        topic_arn = param['Parameter']['Value']
+        try:
+            topic_arn = ssm.get_parameter(
+                Name='/racetracker/sns-topic-arn',
+                WithDecryption=True
+            )['Parameter']['Value']
 
-        sns.subscribe(
-            TopicArn=topic_arn,
-            Protocol='email',
-            Endpoint=crew_contact,
-            Attributes={
-                'FilterPolicy': json.dumps({'bibNumber': [bib_number]})
-            }
-        )
+            sns.subscribe(
+                TopicArn=topic_arn,
+                Protocol='email',
+                Endpoint=crew_contact,
+                Attributes={
+                    'FilterPolicy': json.dumps({'bibNumber': [bib_number]})
+                }
+            )
+        except sns.exceptions.ClientError as e:
+            # Subscription already exists — that's fine, continue
+            print(f"SNS subscription note: {str(e)}")
+        except Exception as e:
+            print(f"SNS subscribe warning: {str(e)}")
 
         table.put_item(Item={
             'raceId': race_id,
