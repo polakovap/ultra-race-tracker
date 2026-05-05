@@ -775,12 +775,29 @@
   <div id="tab-leaderboard" class="tab-content">
     <div class="lookup-card">
       <h2>Live Standings</h2>
-      <div class="input-row">
-        <div class="input-wrap">
-          <label class="input-label">Bib Numbers to check (comma separated)</label>
-          <input type="text" id="lb-bibs" placeholder="001, 002, 003" value="001, 002, 003" />
+      <div style="display:flex; align-items:center; justify-content:space-between;">
+        <div style="display:flex; gap:24px; align-items:center;">
+          <div>
+            <div class="stat-value" id="lb-total" style="font-size:28px;">—</div>
+            <div class="stat-label">Total Runners</div>
+          </div>
+          <div>
+            <div class="stat-value" id="lb-racing" style="font-size:28px; color:#60a5fa;">—</div>
+            <div class="stat-label">Racing</div>
+          </div>
+          <div>
+            <div class="stat-value" id="lb-finished" style="font-size:28px; color:#4ade80;">—</div>
+            <div class="stat-label">Finished</div>
+          </div>
+          <div>
+            <div class="stat-value" id="lb-dnf" style="font-size:28px; color:#f87171;">—</div>
+            <div class="stat-label">DNF</div>
+          </div>
         </div>
-        <button class="btn btn-primary" onclick="loadLeaderboard()">Refresh</button>
+        <div style="display:flex; align-items:center; gap:12px;">
+          <span id="lb-updated" style="font-family:'Space Mono',monospace; font-size:10px; color:var(--muted);">—</span>
+          <button class="btn btn-secondary" onclick="loadLeaderboard()">↻ Refresh</button>
+        </div>
       </div>
     </div>
     <div class="form-card" style="padding:0; overflow:hidden;">
@@ -796,7 +813,7 @@
           </tr>
         </thead>
         <tbody id="leaderboard-body">
-          <tr><td colspan="6" style="text-align:center; color:var(--muted); padding:32px; font-size:13px;">Click Refresh to load standings</td></tr>
+          <tr><td colspan="6" style="text-align:center; color:var(--muted); padding:32px; font-size:13px;">Loading...</td></tr>
         </tbody>
       </table>
     </div>
@@ -913,6 +930,13 @@
     document.querySelectorAll('.tab-content').forEach(t => t.classList.remove('active'));
     document.getElementById('tab-' + name).classList.add('active');
     event.target.classList.add('active');
+
+    //load leaderboard immediately when switching to it
+    if (name === 'leaderboard') {
+      startLeaderboardAutoRefresh();
+    } else {
+      stopLeaderboardAutoRefresh();
+    }
   }
 
   function showToast(msg, type = 'success') {
@@ -978,63 +1002,61 @@
     }
   }
 
+
   async function loadLeaderboard() {
-    const bibsRaw = document.getElementById('lb-bibs').value;
-    const bibs = bibsRaw.split(',').map(b => b.trim()).filter(Boolean);
-    const btn = event.target;
-    setLoading(btn, true);
-
     const tbody = document.getElementById('leaderboard-body');
-    tbody.innerHTML = '<tr><td colspan="6" style="text-align:center; color:var(--muted); padding:32px; font-size:13px;">Loading...</td></tr>';
-
+    
     try {
-      const results = await Promise.all(bibs.map(bib =>
-        fetch(`${API}/runners/${bib}?raceId=race-001`).then(r => r.json()).catch(() => null)
-      ));
+      const res = await fetch(`${API}/runners?raceId=race-001`);
+      const data = await res.json();
 
-      const runners = results.filter(r => r && r.runner).map(r => r.runner);
+      if (!res.ok) {
+        tbody.innerHTML = '<tr><td colspan="6" style="text-align:center; color:var(--muted); padding:32px;">Failed to load</td></tr>';
+        return;
+      }
+
+      const runners = data.runners || [];
+
+      // Update stats
+      document.getElementById('lb-total').textContent = data.totalRunners || 0;
+      document.getElementById('lb-racing').textContent = runners.filter(r => r.status === 'RACING').length;
+      document.getElementById('lb-finished').textContent = runners.filter(r => r.status === 'FINISHED').length;
+      document.getElementById('lb-dnf').textContent = runners.filter(r => r.status === 'DNF').length;
+      document.getElementById('lb-updated').textContent = 'Updated ' + new Date().toLocaleTimeString();
 
       if (runners.length === 0) {
         tbody.innerHTML = '<tr><td colspan="6" style="text-align:center; color:var(--muted); padding:32px;">No runners found</td></tr>';
         return;
       }
 
+      // Sort runners
       const checkpointOrder = {
-        'Finish Line': 9,
-        'Aid Station 8': 8,
-        'Aid Station 7': 7,
-        'Aid Station 6': 6,
-        'Aid Station 5': 5,
-        'Aid Station 4': 4,
-        'Aid Station 3': 3,
-        'Aid Station 2': 2,
-        'Aid Station 1': 1,
-        'Not started': 0
-    };
+        'Finish Line': 9, 'Aid Station 8': 8, 'Aid Station 7': 7,
+        'Aid Station 6': 6, 'Aid Station 5': 5, 'Aid Station 4': 4,
+        'Aid Station 3': 3, 'Aid Station 2': 2, 'Aid Station 1': 1, 'Not started': 0
+      };
 
-    runners.sort((a, b) => {
-    // DNF always last
-    if (a.status === 'DNF' && b.status !== 'DNF') return 1;
-    if (b.status === 'DNF' && a.status !== 'DNF') return -1;
+      runners.sort((a, b) => {
+        // DNF always last
+        if (a.status === 'DNF' && b.status !== 'DNF') return 1;
+        if (b.status === 'DNF' && a.status !== 'DNF') return -1;
 
-    // Both finished — whoever finished first wins
-    if (a.status === 'FINISHED' && b.status === 'FINISHED') {
+        // Both finished — whoever finished first wins
+        if (a.status === 'FINISHED' && b.status === 'FINISHED') {
+          return (a.lastSeen || '').localeCompare(b.lastSeen || '');
+        }
+
+        // Finished beats everyone
+        if (a.status === 'FINISHED') return -1;
+        if (b.status === 'FINISHED') return 1;
+
+
+        const aScore = checkpointOrder[a.lastCheckpoint] ?? 0;
+        const bScore = checkpointOrder[b.lastCheckpoint] ?? 0;
+        if (bScore !== aScore) return bScore - aScore;
         return (a.lastSeen || '').localeCompare(b.lastSeen || '');
-    }
+      });
 
-    // Finished beats everyone
-    if (a.status === 'FINISHED') return -1;
-    if (b.status === 'FINISHED') return 1;
-
-    // Sort by furthest checkpoint
-    const aScore = checkpointOrder[a.lastCheckpoint] ?? 0;
-    const bScore = checkpointOrder[b.lastCheckpoint] ?? 0;
-
-    if (bScore !== aScore) return bScore - aScore;
-
-    // Same checkpoint — whoever got there first wins
-    return (a.lastSeen || '').localeCompare(b.lastSeen || '');
-    });
       tbody.innerHTML = runners.map((r, i) => `
         <tr>
           <td><span class="rank ${i < 3 ? 'top' : ''}">${i + 1}</span></td>
@@ -1046,11 +1068,21 @@
         </tr>
       `).join('');
 
-      showToast('Leaderboard updated');
     } catch(e) {
-      showToast('Failed to load leaderboard', 'error');
-    } finally {
-      setLoading(btn, false);
+      tbody.innerHTML = '<tr><td colspan="6" style="text-align:center; color:var(--muted); padding:32px;">Network error</td></tr>';
+    }
+  }
+
+  function startLeaderboardAutoRefresh() {
+    loadLeaderboard();
+    if (leaderboardInterval) clearInterval(leaderboardInterval);
+    leaderboardInterval = setInterval(loadLeaderboard, 30000);
+  }
+
+  function stopLeaderboardAutoRefresh() {
+    if (leaderboardInterval) {
+      clearInterval(leaderboardInterval);
+      leaderboardInterval = null;
     }
   }
 
@@ -1161,6 +1193,13 @@
   // Enter key on lookup
   document.getElementById('lookup-bib').addEventListener('keydown', e => {
     if (e.key === 'Enter') lookupRunner();
+  });
+
+  // Auto-load leaderboard if it's the active tab on page load
+  // (it's not by default but good practice)
+  document.addEventListener('DOMContentLoaded', () => {
+    // Pre-load leaderboard data in background
+    loadLeaderboard();
   });
 </script>
 </body>
