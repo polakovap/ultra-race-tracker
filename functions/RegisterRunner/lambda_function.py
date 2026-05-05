@@ -34,9 +34,11 @@ def lambda_handler(event, context):
             }
 
         # Subscribe crew email to SNS topic
-        topic_arn = ssm.get_parameter(
-            Name='/racetracker/sns-topic-arn'
-        )['Parameter']['Value']
+        param = ssm.get_parameter(
+            Name='/racetracker/sns-topic-arn',
+            WithDecryption=True
+        )
+        topic_arn = param['Parameter']['Value']
 
         sns.subscribe(
             TopicArn=topic_arn,
