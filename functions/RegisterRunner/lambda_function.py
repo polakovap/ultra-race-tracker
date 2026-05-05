@@ -5,6 +5,7 @@ from datetime import datetime
 
 dynamodb = boto3.resource('dynamodb')
 ssm = boto3.client('ssm')
+sns = boto3.client('sns')
 table = dynamodb.Table(os.environ['RUNNERS_TABLE'])
 
 def get_allowed_origin():
@@ -16,7 +17,7 @@ def get_allowed_origin():
 
 def lambda_handler(event, context):
     allowed_origin = get_allowed_origin()
-    
+
     try:
         body = json.loads(event.get('body', '{}'))
         race_id = body.get('raceId')
@@ -32,6 +33,20 @@ def lambda_handler(event, context):
                 'body': json.dumps({'error': 'Missing required fields'})
             }
 
+        # Subscribe crew email to SNS topic
+        topic_arn = ssm.get_parameter(
+            Name='/racetracker/sns-topic-arn'
+        )['Parameter']['Value']
+
+        sns.subscribe(
+            TopicArn=topic_arn,
+            Protocol='email',
+            Endpoint=crew_contact,
+            Attributes={
+                'FilterPolicy': json.dumps({'bibNumber': [bib_number]})
+            }
+        )
+
         table.put_item(Item={
             'raceId': race_id,
             'bibNumber': bib_number,
@@ -46,7 +61,7 @@ def lambda_handler(event, context):
             'statusCode': 201,
             'headers': {'Access-Control-Allow-Origin': allowed_origin},
             'body': json.dumps({
-                'message': 'Runner registered successfully',
+                'message': 'Runner registered — crew notification email sent to confirm subscription',
                 'bibNumber': bib_number
             })
         }
